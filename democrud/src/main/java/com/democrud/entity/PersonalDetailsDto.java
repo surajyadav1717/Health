@@ -1,5 +1,7 @@
 package com.democrud.entity;
 
+import com.democrud.enums.Status;
+
 //dto me hamesa request hoga simple 
 public class PersonalDetailsDto {
 	
@@ -134,15 +136,13 @@ public class PersonalDetailsDto {
 	}
 	
 	
+
 	public Character getStatus() {
 		return status;
 	}
-	public void setStatus(char c) {
-		this.status = c;
+	public void setStatus(Character character) {
+		this.status = character;
 	}
-	
-	
-	
 	public PersonalDetailsDto(Integer id, String fullName, String gender, String dateofBirth, String profession,
 			String ocupation, String maritalStatus, String emailId, String contactDetails, String address, String city,
 			String addharCard, String pinCode, String alternateAddress, String pancardNo, String area, String town,
@@ -166,16 +166,12 @@ public class PersonalDetailsDto {
 		this.area = area;
 		this.town = town;
 		this.state = state;
-		this.status=status;
+		this.status = status;
 	}
 	public PersonalDetailsDto() {
 		super();
 		// TODO Auto-generated constructor stub
 	}
-
-	
-	
-	
 	
 	
 

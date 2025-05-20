@@ -3,6 +3,9 @@ package com.democrud.entity;
 import java.time.LocalDateTime;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+
+import com.democrud.enums.Status;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -20,11 +23,11 @@ public class PersonalDetails {
 	private Integer personalId ;
 
 
-	@CreationTimestamp //annotaion h jo creation pe lagate hai
-	@Column(updatable = false)  // Ensures karta hai only when data set ho
+	@CreationTimestamp 
+	@Column(updatable = false)  
 	private LocalDateTime createdAt;
 
-	@UpdateTimestamp //annotaion h jo updation pe lagate hai
+	@UpdateTimestamp 
 	private LocalDateTime updatedAt;
 
 	@Column(name ="fullname")
@@ -82,23 +85,13 @@ public class PersonalDetails {
 	@Column(name = "status")
 	private Character status;
 
+//	@Column(name = "status")
+//	private Status status;
+	
 
 	@Column(name = "genderId)")
 	private Integer genderId1;
-	
 
-	@Column(name = "status_record")
-    private Character statusRecord = 'N'; 
-
-
-
-	public Character getStatusRecord() {
-		return statusRecord;
-	}
-
-	public void setStatusRecord(Character statusRecord) {
-		this.statusRecord = statusRecord;
-	}
 
 	public Integer getPersonalId() {
 		return personalId;
@@ -261,6 +254,8 @@ public class PersonalDetails {
 		this.pancardNo = pancardNo;
 	}
 
+	
+
 	public Character getStatus() {
 		return status;
 	}
@@ -278,7 +273,6 @@ public class PersonalDetails {
 	}
 
 	
-
 	public PersonalDetails(Integer personalId, LocalDateTime createdAt, LocalDateTime updatedAt, String fullName,
 			String gender, String dateofBirth, String profession, String ocupation, String maritalStatus,
 			String emailId, String contactDetails, String address, String alternateAddress, String city, String area,

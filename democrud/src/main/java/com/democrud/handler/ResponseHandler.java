@@ -16,30 +16,30 @@ public class ResponseHandler {
 
 	private long errorRecord;
 
-	private Integer userId;
-	
-	private String username;
-	
-	private String emailId;
-	
-	private String role;
+//	private Integer userId;
+//	
+//	private String username;
+//	
+//	private String emailId;
+//	
+//	private String role;
+//
 
-
-	public String getEmailId() {
-		return emailId;
-	}
-
-	public void setEmailId(String emailId) {
-		this.emailId = emailId;
-	}
-
-	public String getRole() {
-		return role;
-	}
-
-	public void setRole(String role) {
-		this.role = role;
-	}
+//	public String getEmailId() {
+//		return emailId;
+//	}
+//
+//	public void setEmailId(String emailId) {
+//		this.emailId = emailId;
+//	}
+//
+//	public String getRole() {
+//		return role;
+//	}
+//
+//	public void setRole(String role) {
+//		this.role = role;
+//	}
 
 	public boolean isStatus() {
 		return status;
@@ -118,21 +118,21 @@ public class ResponseHandler {
 		// TODO Auto-generated constructor stub
 	}
 
-	public Integer getUserId() {
-		return userId;
-	}
-
-	public void setUserId(Integer userId) {
-		this.userId = userId;
-	}
-
-	public String getUsername() {
-		return username;
-	}
-
-	public void setUsername(String username) {
-		this.username = username;
-	}
+//	public Integer getUserId() {
+//		return userId;
+//	}
+//
+//	public void setUserId(Integer userId) {
+//		this.userId = userId;
+//	}
+//
+//	public String getUsername() {
+//		return username;
+//	}
+//
+//	public void setUsername(String username) {
+//		this.username = username;
+//	}
 
 
 

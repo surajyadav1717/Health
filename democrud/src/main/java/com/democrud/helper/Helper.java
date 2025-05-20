@@ -37,6 +37,7 @@ public class Helper {
 	public static ByteArrayInputStream dataToExcel(List<PersonalDetails> list) throws IOException {
 
 
+		
 		Workbook workbook = new XSSFWorkbook();
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		try {
@@ -94,6 +95,18 @@ public class Helper {
 		}
 	}
 
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 //	public static boolean checkExcelFormat(MultipartFile file) {
 //
 //

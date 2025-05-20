@@ -20,6 +20,7 @@ import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
+import jakarta.servlet.http.HttpServletRequest;
 
 @Component
 public class TokenGenerator {
@@ -48,133 +49,86 @@ public class TokenGenerator {
 
 		Map<String, Object> claims = new HashMap<>();
 		claims.put("userId", userInfo.getUserId());
-	///	claims.put("username", userInfo.getUsername());
+		///	claims.put("username", userInfo.getUsername());
 		claims.put("emailId", userInfo.getEmailId());
 		claims.put("role", userInfo.getRole());   
 
 		//claims.put("password", userInfo.getPassword());
 
 		long nowMillis = System.currentTimeMillis();
-		long expMillis = nowMillis +  24 * 60 * 60 * 1000; // 24 hrs 
+		long expMillis = nowMillis +  1000 * 60 * 60 * 24; // 24 hrs 
+		//  long expirationTimeMs = 1000 * 60 * 60; // 24 hour
+
 		Date now = new Date(nowMillis);
 		Date expiry = new Date(expMillis);
-
-		return Jwts.builder()
-				.setClaims(claims)
-				.setSubject(userInfo.getUsername())
-				.setIssuedAt(now)
-				.setExpiration(expiry)
-				.signWith(key)
-				.compact();
-	}
-
-	public String authenticateAndGenerateToken(String username, String password, Integer userId)
-			throws AuthenticationException {
-		if (auth.authenticateUser(username, password) != null) {
-			return generateToken(username, userId);
-		} else {
-			throw new AuthenticationException("Invalid username or password");
-		}
-	}
-
-
-
-//	public static Integer extractUserId(String token) {
-//		try {
-//			return Jwts.parserBuilder()
-//					.setSigningKey(key)
-//					.build()
-//					.parseClaimsJws(token)
-//					.getBody()
-//					.get("userId", Integer.class);
-//		} catch (Exception e) {
-//			e.printStackTrace();
-//			return null;
-//		}
-//	}
-
-
-
-//	public static String extractEmailId(String token) {
-//		try {
-//			return Jwts.parserBuilder()
-//					.setSigningKey(key)
-//					.build()
-//					.parseClaimsJws(token)
-//					.getBody()
-//					.get("emailId", String.class);
-//		} catch (Exception e) {
-//			e.printStackTrace();
-//			return null;
-//		}
-//	}
-//
-//	public static String extractRole(String token) {
-//		try {
-//			return Jwts.parserBuilder()
-//					.setSigningKey(key)
-//					.build()
-//					.parseClaimsJws(token)
-//					.getBody()
-//					.get("role", String.class);
-//		} catch (Exception e) {
-//			e.printStackTrace();
-//			return null;
-//		}
-//	}
-
-
+		 return Jwts.builder()
+	                .setClaims(claims)
+	                .setSubject(userInfo.getUsername())  // ✅ username
+	                .setIssuedAt(now)
+	                .setExpiration(expiry)
+	                .signWith(key)
+	                .compact();
+	    }
 	
-	
-	
+	 public String authenticateAndGenerateToken(String username, String password, Integer userId)
+	            throws AuthenticationException {
+	        UserInfo userInfo = auth.authenticateUser(username, password);
+	        if (userInfo != null) {
+	            return generateToken(userInfo);  // ✅ Fixed line
+	        } else {
+	            throw new AuthenticationException("Invalid username or password");
+	        }
+	    }
 
-//	public static String extractUsername(String token) {
-//		try {
-//			return Jwts.parserBuilder()
-//					.setSigningKey(key)
-//					.build()
-//					.parseClaimsJws(token)
-//					.getBody()
-//					.get("username", String.class);  
-//		} catch (Exception e) {
-//			e.printStackTrace();
-//			return null;
+//	public String authenticateAndGenerateToken(String username, String password, Integer userId)
+//			throws AuthenticationException {
+//		if (auth.authenticateUser(username, password) != null) {
+//			return generateToken(username, userId);
+//		} else {
+//			throw new AuthenticationException("Invalid username or password");
 //		}
 //	}
+
+
+//	private String generateToken(String username, Integer userId) {
+//		return null;
+//	}
+
 
 	public static Claims extractAllClaims(String token) {
+		  Claims claims = Jwts.parserBuilder()
+		            .setSigningKey(key)
+		            .build()
+		            .parseClaimsJws(token)
+		            .getBody();
+	   // System.out.println("Extracted Claims: " + claims);  // <== ADD THIS DEBUG
+		return claims;
 
-
-		return Jwts.parserBuilder()
-				.setSigningKey(key)
-				.build()
-				.parseClaimsJws(token)
-				.getBody();
 	}
-	
-	
+
+
 	public static Integer extractUserId(String token) {
 		return extractAllClaims(token).get("userId", Integer.class);
-		
+
 	}
-	
+
 	public static String extractUsername(String token) {
 		return extractAllClaims(token).getSubject();
 	}
-	
+
 
 	public static String extractEmailId(String token) {
 		return extractAllClaims(token).get("emailId", String.class);
-		
+
 	}
-	
+
 	public static String extractRole(String token) {
 		return extractAllClaims(token).get("role", String.class);
-		
+
 	}
-	
-	
-	
+
+
+
 	//
 	//	public static String extractAllClaims (Integer userId , String username , String email, String role ,String token) {
 	//
@@ -189,11 +143,7 @@ public class TokenGenerator {
 
 
 
-	//on use
-	private String generateToken(String username, Integer userId) {
 
-		return null;
-	}
 
 	public boolean isTokenValid(String token) {
 		try {
@@ -202,6 +152,20 @@ public class TokenGenerator {
 		} catch (JwtException e) {
 			return false;
 		}
+	}
+
+
+	public static String extractTokenFromRequest(HttpServletRequest request) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+
+	
+
+	public static String extractClaim(String token, Object object2) {
+		// TODO Auto-generated method stub
+		return null;
 	}
 }
 

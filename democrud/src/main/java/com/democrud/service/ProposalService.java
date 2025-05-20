@@ -2,14 +2,16 @@ package com.democrud.service;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.democrud.dto.PersonalDetailsWithUserDto;
 import com.democrud.entity.PaginationList;
 import com.democrud.entity.PersonalDetails;
 import com.democrud.entity.PersonalDetailsDto;
+
+import jakarta.servlet.http.HttpServletRequest;
 
 @Service
 public interface ProposalService {
@@ -23,11 +25,14 @@ public interface ProposalService {
 	//validation method
 	PersonalDetails  saveProposal(PersonalDetailsDto personalDetailsDto);  //add update me hamesa dto ke method se call hoga 
 
-	public List<PersonalDetails> getAllPersonalDetails();
+	//public List<PersonalDetails> getAllPersonalDetails();
 
-	//public Optional<PersonalDetails> getPersonalDetailsById(Integer id, PersonalDetails personalDetails );
+  //  public PersonalDetailsDto getPersonalById(Integer personalId);
+
 	
-    Optional<PersonalDetails> getPersonalDetailsById(Integer id);
+	//public Optional<PersonalDetails> getPersonalDetailsById(Integer id, PersonalDetails personalDetails );
+
+	//  Optional<PersonalDetails> getPersonalDetailsById(Integer id);
 
 	PersonalDetails updateProposal(Integer id, PersonalDetailsDto updatedDetailsDto); //add update me hamesa dto ke method se call hoga 
 
@@ -44,6 +49,12 @@ public interface ProposalService {
 	List<PersonalDetails> importPersonalDetailsFromExcel(MultipartFile multipartFile ) throws IOException;
 
 	public void processPendingQueues() throws IOException;
+
+	PersonalDetailsDto getPersonalDetailsById(Integer id);
+
+	public PersonalDetailsWithUserDto getAllPersonalDetails(HttpServletRequest request);
+
+	//PersonalDetailsDto getPersonalById(Integer id);
 
 }
 

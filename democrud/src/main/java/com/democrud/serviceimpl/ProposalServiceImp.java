@@ -23,14 +23,19 @@ import org.apache.poi.xssf.usermodel.XSSFRow;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+
+import com.democrud.customerrors.InvalidRequestException;
+import com.democrud.dto.PersonalDetailsWithUserDto;
 import com.democrud.entity.PaginationList;
 import com.democrud.entity.PersonalDetails;
 import com.democrud.entity.PersonalDetailsDto;
 import com.democrud.entity.Queue;
 import com.democrud.entity.ResponseExcel;
 import com.democrud.entity.SearchFilter;
+import com.democrud.handler.ResponseHandler;
 import com.democrud.helper.Helper;
 import com.democrud.helper.TokenGenerator;
 import com.democrud.repository.GenderRepository;
@@ -38,7 +43,9 @@ import com.democrud.repository.ProposerRepository;
 import com.democrud.repository.QueueRepository;
 import com.democrud.repository.ResponseExcelRepository;
 import com.democrud.service.ProposalService;
+import com.democrud.service.WheatherService;
 
+import ch.qos.logback.core.status.Status;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.TypedQuery;
@@ -46,9 +53,12 @@ import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
+import jakarta.servlet.http.HttpServletRequest;
 
 @Service
 public class ProposalServiceImp implements ProposalService {
+
+	private final WheatherService wheatherService;
 
 	@Autowired
 	private final TokenGenerator tokenGenerator;
@@ -65,6 +75,7 @@ public class ProposalServiceImp implements ProposalService {
 	private EntityManager entityManager;
 
 
+
 	@Autowired
 	private ProposerRepository proposerRepository;
 
@@ -78,73 +89,133 @@ public class ProposalServiceImp implements ProposalService {
 	@Autowired
 	private QueueRepository queueRepository;
 
-	ProposalServiceImp(TokenGenerator tokenGenerator) {
+	ProposalServiceImp(TokenGenerator tokenGenerator, WheatherService wheatherService) {
 		this.tokenGenerator = tokenGenerator;
+		this.wheatherService = wheatherService;
 	}
 
-	//	--------------- 1st 
-	public ByteArrayInputStream getActualData() throws IOException {  //data to excel wala method 
 
+	//	--------------- 1st 
+	public ByteArrayInputStream getActualData() throws IOException { 
 		List<PersonalDetails> all = proposerRepository.findAll();
+
+		if(all== null || all.isEmpty() ) {
+
+			throw new IllegalArgumentException("Data Is Null And Empty");
+		}
 		ByteArrayInputStream byteArrayInputStream = Helper.dataToExcel(all);
 		return byteArrayInputStream;
 	}
 
 
 
-	//------2nd 	
-	//@Scheduled(fixedRate=500)
 	public ByteArrayInputStream exportEmployeesToExcel() {
 
-		//String filePath ="C:\\ExportData\\DownloadData\\PersonalDetails.xlsx";
+		List<PersonalDetails> personalDetailsList = proposerRepository.findAll(); 
 
-		try (Workbook workbook = new XSSFWorkbook ();
+		if(personalDetailsList==null || personalDetailsList.isEmpty()) {
+
+			throw new IllegalArgumentException("Data Is Null and Empty Inavlid to fetch from Data Base  ");
+
+		}
+
+		try (Workbook workbook = new XSSFWorkbook();
 				ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+
 			Sheet sheet = workbook.createSheet("PersonalDetails");
 			Row headerRow = sheet.createRow(0);
 
-			List<String> headers = Arrays.asList("fullName*", "*gender", "*dateofBirth","*emailId", "*address","city" ,"state" , "pincode");
+			List<String> headers = Arrays.asList("Full Name", "Gender", "Date of Birth", "Email Id", "Address", "City", "State", "Pincode");
 
 			for (int i = 0; i < headers.size(); i++) {
 				Cell cell = headerRow.createCell(i);
 				cell.setCellValue(headers.get(i));
 			}
 
-			String uid = UUID.randomUUID().toString().replace("-","" );
+			int rowIdx = 1;
+			for (PersonalDetails pd : personalDetailsList) {
+				Row row = sheet.createRow(rowIdx++);
 
-			String filename= "personal_details_" +uid+".xlsx";
+				row.createCell(0).setCellValue(pd.getFullName());
+				row.createCell(1).setCellValue(pd.getGender());
+				row.createCell(2).setCellValue(pd.getDateofBirth() != null ? pd.getDateofBirth().toString() : "");
+				row.createCell(3).setCellValue(pd.getEmailId());
+				row.createCell(4).setCellValue(pd.getAddress());
+				row.createCell(5).setCellValue(pd.getTown());
+				row.createCell(6).setCellValue(pd.getState());
+				row.createCell(7).setCellValue(pd.getPincode());
+			}
 
-			String filePath = "C:\\Export Data\\DownloadData\\"+filename;
-			workbook.write(out);
-			//return new ByteArrayInputStream(out.toByteArray());
+			String uid = UUID.randomUUID().toString().replace("-", "");
+			String filename = "personal_details_" + uid + ".xlsx";
+			String filePath = "C:\\Export Data\\DownloadData\\" + filename;
 
-			FileOutputStream fileOutputStream= new FileOutputStream(filePath);
+			FileOutputStream fileOutputStream = new FileOutputStream(filePath);
 			workbook.write(fileOutputStream);
-			workbook.close();
 			fileOutputStream.close();
 
-			System.out.println("File Exported to File Path"+filePath);
+			workbook.write(out);
 
+			System.out.println("File Exported to File Path " + filePath);
+			return new ByteArrayInputStream(out.toByteArray());
 
 		} catch (IOException e) {
 			throw new RuntimeException("Error while creating Excel file", e);
 		}
-		return null;
-
-
 	}
 
-	//	//3
-	//	public List<PersonalDetails> getAllPersonalDetailsData(){
-	//		return this.proposerRepository.findAll() ;
+
+
+	//	//------2nd 	
+	//	//@Scheduled(fixedRate=500)
+	//	public ByteArrayInputStream exportEmployeesToExcel() {
+	//
+	//		//String filePath ="C:\\ExportData\\DownloadData\\PersonalDetails.xlsx";
+	//	    List<PersonalDetails> personalDetailsList = proposerRepository.findAll(); // Fetching from DB
+	//
+	//		try (Workbook workbook = new XSSFWorkbook ();
+	//				ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+	//			Sheet sheet = workbook.createSheet("PersonalDetails");
+	//			Row headerRow = sheet.createRow(0);
+	//			
+	////			if (in == null) {
+	////				return ResponseEntity.internalServerError().build();
+	////			}
+	//			
+	//			List<String> headers = Arrays.asList("fullName*", "*gender", "*dateofBirth","*emailId", "*address","city" ,"state" , "pincode");
+	//
+	//			for (int i = 0; i < headers.size(); i++) {
+	//				Cell cell = headerRow.createCell(i);
+	//				cell.setCellValue(headers.get(i));
+	//			}
+	//
+	//			String uid = UUID.randomUUID().toString().replace("-","" );
+	//
+	//			String filename= "personal_details_" +uid+".xlsx";
+	//
+	//			String filePath = "C:\\Export Data\\DownloadData\\"+filename;
+	//			workbook.write(out);
+	//			//return new ByteArrayInputStream(out.toByteArray());
+	//
+	//			FileOutputStream fileOutputStream= new FileOutputStream(filePath);
+	//			workbook.write(fileOutputStream);
+	//			workbook.close();
+	//			fileOutputStream.close();
+	//
+	//			System.out.println("File Exported to File Path"+filePath);
+	//
+	//
+	//		} catch (IOException e) {
+	//			throw new RuntimeException("Error while creating Excel file", e);
+	//		}
+	//		return null;
+	//
 	//
 	//	}
-	//
 	//
 
 	@Override
 	public PersonalDetails saveProposal(PersonalDetailsDto personalDetailsDto) {
-
 
 		String fullName = personalDetailsDto.getFullName();
 
@@ -159,7 +230,6 @@ public class ProposalServiceImp implements ProposalService {
 			throw new IllegalArgumentException("Gender must be Male, Female, or Other.");
 		}
 
-		// trim whitespaces remove karta hai
 		if (personalDetailsDto.getDateofBirth() == null || personalDetailsDto.getDateofBirth().trim().isEmpty()) {
 			throw new IllegalArgumentException("Date of Birth is required.");
 		}
@@ -262,8 +332,9 @@ public class ProposalServiceImp implements ProposalService {
 
 
 
-		prdetails.setFullName(personalDetailsDto.getFullName()); //                                       personaldetails refrence variable se data set hoga
-		// and personaldto se data get hoga
+		//Add and update me hamesa data entity se set hoga anbd dto se get hoga 
+
+		prdetails.setFullName(personalDetailsDto.getFullName()); //                                     personaldetails refrence variable se data set hoga
 
 		System.out.println("Saving Name: " + prdetails.getFullName());
 		prdetails.setDateofBirth(personalDetailsDto.getDateofBirth());
@@ -283,27 +354,89 @@ public class ProposalServiceImp implements ProposalService {
 		prdetails.setState(personalDetailsDto.getState());
 		prdetails.setTown(personalDetailsDto.getTown());
 		prdetails.setStatus(personalDetailsDto.getStatus());
-
-		// details saved to Y
-		personalDetailsDto.setStatus('Y');
+		proposerRepository.findByStatus(com.democrud.enums.Status.ACTIVE);
 		return proposerRepository.save(prdetails);                                                        // save ho jyga prdetails ka ref object
 	}
 
+
 	@Override
-	public List<PersonalDetails> getAllPersonalDetails() {
+	public PersonalDetailsWithUserDto getAllPersonalDetails(HttpServletRequest request) {
+		String header = request.getHeader("Authorization");
 
-		List<PersonalDetails> all = proposerRepository.findAllByStatus('Y');   // for status
-		if(all==null|| all.isEmpty()) {
+		Integer userId = null;
+		String username = null;
+		String email = null;
+		String role = null;
 
+		if (header != null && header.startsWith("Bearer ")) {
+			String token = header.substring(7);
+
+			userId = TokenGenerator.extractUserId(token);
+			username = TokenGenerator.extractUsername(token);
+			email = TokenGenerator.extractEmailId(token);
+			role = TokenGenerator.extractRole(token);
+
+			System.err.println("userID-------->" + userId + " username-------->" + username + " email---->" + email + " role--->" + role);
+		}
+
+		List<PersonalDetails> all = proposerRepository.findAllByStatus('Y');
+		if (all == null || all.isEmpty()) {
 			throw new IllegalArgumentException("List Is Null And Empty ");
 		}
 
-		return all;
+		PersonalDetailsWithUserDto dto = new PersonalDetailsWithUserDto();
+		dto.setPersonalDetails(all);
+		dto.setUserId(userId);
+		dto.setUsername(username);
+		dto.setEmail(email);
+		dto.setRole(role);
+
+
+		return dto;
 	}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	//	@Override
+	//	public PersonalDetailsWithUserDto getAllPersonalDetails(HttpServletRequest request) {
+	//
+	//		//ResponseHandler responseHandler = new ResponseHandler(); //object bana
+	//		String header = request.getHeader("Authorization");
+	//
+	//		if(header!=null && header.startsWith("Bearer ")) {
+	//			String token = header.substring(7);
+	//
+	//			Integer userId = TokenGenerator.extractUserId(token);
+	//			String username = TokenGenerator.extractUsername(token);
+	//			String email= TokenGenerator.extractEmailId(token);
+	//			String role=TokenGenerator.extractRole(token);
+	//
+	//			System.err.println("userID-------->"+ userId+ "username-------->"+ username + "email---->"+email +"role--->"+role);
+	//		}
+	//
+	//
+	//		List<PersonalDetails> all = proposerRepository.findAllByStatus('Y');   // for status
+	//		if(all==null|| all.isEmpty()) {
+	//
+	//			throw new IllegalArgumentException("List Is Null And Empty ");
+	//		}
+	//		return all;
+	//	}
 
 	@Override 																										// here same dto se
 	public PersonalDetails updateProposal(Integer id, PersonalDetailsDto updatedDetailsDto) {
-		// Fetch existing record
 
 		PersonalDetails existingDetails = proposerRepository.findById(id)
 				.orElseThrow(() -> new EntityNotFoundException("PersonalDetails with ID " + id + " not found."));
@@ -450,77 +583,69 @@ public class ProposalServiceImp implements ProposalService {
 		else {
 			existingDetails.setStatus(updatedDetailsDto.getStatus());
 		}
+
+		existingDetails.setStatus('Y');
+		//proposerRepository.findByStatus(com.democrud.enums.Status.ACTIVE);
 		return proposerRepository.save(existingDetails);
 
 	}
 
 
-	public PersonalDetails deleteById(Integer id) {
-
-		try {
-
-			if (id == null || id <= 0) {
-
-				throw new IllegalAccessError("Id Should Be Not Negative and Less than Zero");
-
-			}
-			// fetching record -- based on id
-			Optional<PersonalDetails> optionalDetails = proposerRepository.findById(id);
-
-			// if not present ! - yeh hota hai
-			if (!optionalDetails.isPresent()) {
-
-				throw new IllegalArgumentException("PersonalDetails with ID \" + id + \" not found. Status: N\"");
-			}
-
-			// Data found, update status to "Y"
-			PersonalDetails personalDetails = optionalDetails.get();													// optional hai to get karna hoga data ko
-			personalDetails.setStatus('N'); 																									// Mark before deletion
-			proposerRepository.save(personalDetails);
-			// successfully. Status: N");
-
-		} catch (Exception e) {
-			e.printStackTrace();
-
-			throw new IllegalArgumentException("An error :" + e.getMessage());
-		}
-		return null;
-
-	}
-
-//	@Override
-//	public Optional<PersonalDetails> getPersonalDetailsById(Integer id , PersonalDetails details) {
-//
-//		PersonalDetailsDto detailsDto = new PersonalDetailsDto();
-//
-//		if(details ==null ) {
-//			throw new IllegalArgumentException("List Of Data Is Null");
+//	public PersonalDetails deleteById(Integer id) {
+//		if (id == null || id <= 0) {
+//			throw new IllegalArgumentException("ID must be a positive non-zero integer");
 //		}
 //
-//		details.setFullName(detailsDto.getFullName());
-//		details.setDateofBirth(details.getDateofBirth());
-//		details.setEmailId(detailsDto.getEmailId());
-//		details.setAddress(detailsDto.getAddress());
-//		details.setCity(detailsDto.getCity());
-//		details.setContactDetails(detailsDto.getContactDetails());
-//		details.setGender(detailsDto.getGender());
-//		details.setOcupation(detailsDto.getOcupation());
-//		details.setProfession(detailsDto.getProfession());
-//		details.setMaritalStatus(detailsDto.getMaritalStatus());
-//		details.setPincode(detailsDto.getPinCode());
-//		details.setAlternateAddress(detailsDto.getAlternateAddress());
-//		details.setAddharCard(detailsDto.getAddharCard());
-//		details.setArea(detailsDto.getArea());
-//		details.setPancardNo(detailsDto.getPancardNo());
-//		details.setState(detailsDto.getState());
-//		details.setTown(detailsDto.getTown());
-//		details.setStatus(detailsDto.getStatus());
+//		Optional<PersonalDetails> optionalDetails = proposerRepository.findById(id);
 //
+//		if (optionalDetails.isEmpty()) {
+//			throw new EntityNotFoundException("PersonalDetails with ID " + id + " not found");
+//		}
 //
-//		return proposerRepository.findById(id);
+//		PersonalDetails personalDetails = optionalDetails.get();
 //
+//		if (personalDetails.getStatus() == com.democrud.enums.Status.INACTIVE) {
+//			throw new IllegalStateException("PersonalDetails with ID " + id + " is already inactive");
+//		}
 //
+//		personalDetails.setStatus(com.democrud.enums.Status.INACTIVE); // Soft delete
+//		return proposerRepository.save(personalDetails);
 //	}
+
+
+
+
+
+		public PersonalDetails deleteById(Integer id) {
+	
+			try {
+	
+				if (id == null || id <= 0) {
+	
+					throw new IllegalAccessError("Id Should Be Not Negative and Less than Zero");
+	
+				}
+				Optional<PersonalDetails> optionalDetails = proposerRepository.findById(id);
+	
+				if (!optionalDetails.isPresent()) {
+	
+					throw new IllegalArgumentException("PersonalDetails with ID \" + id + \" not found. Status: N\"");
+				}
+	
+				PersonalDetails personalDetails = optionalDetails.get();													// optional hai to get karna hoga data ko
+				personalDetails.setStatus('N'); 																									// Mark before deletion
+				proposerRepository.findAllByStatus('N');
+				proposerRepository.save(personalDetails);
+	
+			} catch (Exception e) {
+				e.printStackTrace();
+	
+				throw new IllegalArgumentException("An error :" + e.getMessage());
+				
+			}
+			return null;
+	
+		}
 
 
 	//for (PersonalDetails p : personalDetailsList) {
@@ -535,134 +660,72 @@ public class ProposalServiceImp implements ProposalService {
 	//		return resultData;
 	//	}
 
+
+
 	@Override
 	public List<PersonalDetails> getPaginationList(PaginationList paginationList) {
 
+		if (paginationList == null) {
+			throw new IllegalArgumentException("Pagination List is empty");
+		}
 
-		// 2 stp
-		CriteriaBuilder criteriaBuilder = entityManager.getCriteriaBuilder();									 // Yeh actually entity class se ayga
-		// criteria builder banega
-		CriteriaQuery<PersonalDetails> criteriaQuery = criteriaBuilder.createQuery(PersonalDetails.class); // then
+		CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+		CriteriaQuery<PersonalDetails> cq = cb.createQuery(PersonalDetails.class);
+		Root<PersonalDetails> root = cq.from(PersonalDetails.class);
 
-		Root<PersonalDetails> root = criteriaQuery.from(PersonalDetails.class);
-
-		// SearchFilter [] searchFilters = paginationList.getSearchFilters();
-
-		// predicate is easy to add when list we want to add using AND operator
 		List<Predicate> predicates = new ArrayList<>();
 
-		List<SearchFilter> searchFilters = paginationList.getFilters();
-
-		String status  = "";
-
-		if (searchFilters != null)
-
-			//statrus yes and no wala 
-			for (SearchFilter f : searchFilters) {
-
-				if (f.getStatus() != null) {
-					if ("N".equalsIgnoreCase(f.getStatus())) {
-						predicates.add(criteriaBuilder.equal(root.get("status"), "N"));
-					} else {
-						predicates.add(criteriaBuilder.equal(root.get("status"), "Y"));
-					}
-
-
-					predicates.add(criteriaBuilder.like(root.get("status"), "%" + f.getStatus() + "%"));
+		List<SearchFilter> filters = paginationList.getFilters();
+		if (filters != null) {
+			for (SearchFilter f : filters) {
+				if (f.getStatus() != null && !f.getStatus().isEmpty()) {
+					predicates.add(cb.equal(root.get("status"), f.getStatus()));
+					predicates.add(cb.like(root.get("status"), "%" + f.getStatus() + "%"));
 				}
-
 				if (f.getFullName() != null && !f.getFullName().isEmpty()) {
-
-					predicates.add(criteriaBuilder.like(root.get("fullName"), "%" + f.getFullName() + "%"));
-
+					predicates.add(cb.like(root.get("fullName"), "%" + f.getFullName() + "%"));
 				}
-
 				if (f.getEmailId() != null && !f.getEmailId().isEmpty()) {
-					predicates.add(criteriaBuilder.like(root.get("emailid"), "%" + f.getEmailId() + "%"));
-
+					predicates.add(cb.like(root.get("emailid"), "%" + f.getEmailId() + "%"));
 				}
-
 				if (f.getTown() != null && !f.getTown().isEmpty()) {
-					predicates.add(criteriaBuilder.like(root.get("town"), "%" + f.getTown() + "%"));
-
-				}
-
-				if (f.getStatus() != null) {
-					predicates.add(criteriaBuilder.equal(root.get("status"), f.getStatus()));
-					// criteriaQuery.where(criteriaBuilder.equal(root.get("status"),f.getStatus()));
+					predicates.add(cb.like(root.get("town"), "%" + f.getTown() + "%"));
 				}
 			}
+		}
 
-		// add karega dynamic filter using and operator ke sath
 		if (!predicates.isEmpty()) {
-			criteriaQuery.where(criteriaBuilder.and(predicates.toArray(new Predicate[0])));
+			cq.where(cb.and(predicates.toArray(new Predicate[0])));
 		}
 
-		// default wala h
-		if (paginationList.getPage() >= 0 && paginationList.getSize() >= 0) {
-
-			if (paginationList.getSortBy() == null || paginationList.getSortOrder().isEmpty()) {
-
-				paginationList.setSortBy("id"); // updated sort
-				paginationList.setSortOrder("DESC");
-
-			}
+		if (paginationList.getSortBy() == null || paginationList.getSortBy().isEmpty()) {
+			paginationList.setSortBy("id");
+			paginationList.setSortOrder("DESC");
 		}
 
-		// validation hua hai jab null hua and is empty hai toh
-		if (paginationList.getSortBy() != null && !paginationList.getSortBy().isEmpty()) {
-
-			String sortBy = paginationList.getSortBy();
-
-			// if asc is present hai toh sort kar de
-			if ("ASC".equalsIgnoreCase(paginationList.getSortOrder())) {
-
-				criteriaQuery.orderBy(criteriaBuilder.asc(root.get(sortBy))); // asc le liye
-			}
-
-			else {
-
-				criteriaQuery.orderBy(criteriaBuilder.desc(root.get(sortBy))); // desc ke liye
-
-			}
-
+		if ("ASC".equalsIgnoreCase(paginationList.getSortOrder())) {
+			cq.orderBy(cb.asc(root.get(paginationList.getSortBy())));
+		} else {
+			cq.orderBy(cb.desc(root.get(paginationList.getSortBy())));
 		}
 
-		TypedQuery<PersonalDetails> typedQuery = entityManager.createQuery(criteriaQuery);
-
-		List<PersonalDetails> resultList = typedQuery.getResultList();
-
+		TypedQuery<PersonalDetails> query = entityManager.createQuery(cq);
 
 		if (paginationList.getPage() > 0 && paginationList.getSize() > 0) {
-
-			int page = paginationList.getPage();
-			int size = paginationList.getSize();
-
-			typedQuery.setFirstResult((page - 1) * size);
-
-			if (paginationList.getPage() != null) {
-				System.out.println("---" + page + size);
-			} else {
-				System.out.println(paginationList.getPage());
-
-				System.out.println("Page nhi mila ");
-			}
-			int firstResult = typedQuery.getResultList().size();
-			//TypedQuery<PersonalDetails> setMaxResults = typedQuery.setMaxResults(size);
-
-
-			System.err.println("setMaxResults >>>>"+firstResult);
-			totalRecord = firstResult;
-
-
-
+			int firstResult = (paginationList.getPage() - 1) * paginationList.getSize();
+			query.setFirstResult(firstResult);
+			query.setMaxResults(paginationList.getSize());
 		}
-		return typedQuery.getResultList();
 
-
-
-
+		return query.getResultList();
 	}
+
+
+
+
+
+
+
 
 	@Override
 	public int totalRecords() {
@@ -700,7 +763,7 @@ public class ProposalServiceImp implements ProposalService {
 				Queue queueTracker = new Queue();
 				queueTracker.setTotalRecords(totalExcelRows);
 				queueTracker.setRowsRead(0);
-				queueTracker.setStatus("N"); // Pending
+				queueTracker.setStatus("N"); 
 				queueTracker.setRunAt(LocalDateTime.now());
 				queueTracker.setFilePath(filePath);
 				queueTracker= queueRepository.save(queueTracker);
@@ -721,7 +784,6 @@ public class ProposalServiceImp implements ProposalService {
 
 				ResponseExcel excel = new ResponseExcel();
 
-				//boolean isSuccess;
 				System.out.println("msg commmmming");
 
 
@@ -1027,20 +1089,12 @@ public class ProposalServiceImp implements ProposalService {
 
 	@Override
 	public long totalData() {
-
 		return count;
-
-
-
-
-
-
 	}
 
 
 	@Override
 	public long getErrorCount() {
-
 		return errorRecord;
 	}
 
@@ -1180,15 +1234,84 @@ public class ProposalServiceImp implements ProposalService {
 
 
 	@Override
-	public Optional<PersonalDetails> getPersonalDetailsById(Integer id) {
+	public PersonalDetailsDto getPersonalDetailsById(Integer id) {
 
-		if(id==null) {
-			throw new IllegalArgumentException("Id id Null");
+		Optional<PersonalDetails> details  = proposerRepository.findByPersonalIdAndStatus(id, 'Y');
+
+		if (id == null) {
+			throw new IllegalArgumentException("ID is null");
 		}
-		return proposerRepository.findById(id);
+
+		proposerRepository.findAllByStatus('Y');
+		PersonalDetails entity = proposerRepository.findById(id)
+				.orElseThrow(() -> new IllegalArgumentException("No record found with ID: " + id));
+
+		PersonalDetailsDto dto = new PersonalDetailsDto();
+
+
+		dto.setId(entity.getPersonalId());
+		dto.setFullName(entity.getFullName());
+		dto.setEmailId(entity.getEmailId());
+		dto.setCity(entity.getCity());
+		dto.setDateofBirth(entity.getDateofBirth());
+		dto.setAddress(entity.getAddress());
+		dto.setContactDetails(entity.getContactDetails());
+		dto.setGender(entity.getGender());
+		dto.setOcupation(entity.getOcupation());
+		dto.setProfession(entity.getProfession());
+		dto.setMaritalStatus(entity.getMaritalStatus());
+		dto.setPinCode(entity.getPincode());
+		dto.setAlternateAddress(entity.getAlternateAddress());
+		dto.setAddharCard(entity.getAddharCard());
+		dto.setArea(entity.getArea());
+		dto.setPancardNo(entity.getPancardNo());
+		dto.setState(entity.getState());
+		dto.setTown(entity.getTown());
+		dto.setStatus(entity.getStatus());
+
+		return dto;
 	}
+
+
 }
 
+//
+//	@Override
+//	public PersonalDetailsDto getPersonalById(Integer id) {
+//		//PersonalDetails details  = proposerRepository.findByUserIdAndStatus(personalId, 'Y');
+//
+//		PersonalDetails details = proposerRepository
+//			    .findByPersonalIdAndStatus(id, 'Y')
+//			    .orElseThrow(() -> new IllegalArgumentException("User record not found or invalid userId."));
+//
+//		if (details == null) {
+//			throw new IllegalArgumentException("User Record Not Found Or Invalid UserId");
+//		}
+//
+//		PersonalDetailsDto detailsDto  = new PersonalDetailsDto   ();
+//		detailsDto.setFullName(details.getFullName());
+//		detailsDto.setEmailId(details.getEmailId());
+//		detailsDto.setCity(details.getCity());
+//		detailsDto.setDateofBirth(details.getDateofBirth());
+//		detailsDto.setAddress(details.getAddress());
+//		detailsDto.setContactDetails(details.getContactDetails());
+//		detailsDto.setGender(details.getGender());
+//		detailsDto.setOcupation(details.getOcupation());
+//		detailsDto.setProfession(details.getProfession());
+//		detailsDto.setMaritalStatus(details.getMaritalStatus());
+//		detailsDto.setPinCode(details.getPincode());
+//		detailsDto.setAlternateAddress(details.getAlternateAddress());
+//		detailsDto.setAddharCard(details.getAddharCard());
+//		detailsDto.setArea(details.getArea());
+//		detailsDto.setPancardNo(details.getPancardNo());
+//		detailsDto.setState(details.getState());
+//		detailsDto.setTown(details.getTown());
+//		detailsDto.setStatus(details.getStatus());
+//		
+//		return detailsDto;
+//
+//	}
+//}
 
 
 
@@ -1232,17 +1355,36 @@ public class ProposalServiceImp implements ProposalService {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
+//	@Override
+//	public Optional<PersonalDetails> getPersonalDetailsById(Integer id ,PersonalDetails personalDetails) {
+//
+//		List<PersonalDetails> allByStatus = proposerRepository.findAllByStatus('Y');
+//
+//		if(id==null && personalDetails==null ) {
+//			throw new IllegalArgumentException("Id id Null ");
+//		}
+//	
+//		PersonalDetailsDto  detailsdto = new PersonalDetailsDto();
+//		
+//		detailsdto.setFullName(personalDetails.getFullName());
+//		detailsdto.setCity(personalDetails.getCity());
+//		detailsdto.setContactDetails(personalDetails.getContactDetails());
+//		detailsdto.setGender(personalDetails.getGender());
+//		detailsdto.setOcupation(personalDetails.getOcupation());
+//		detailsdto.setProfession(personalDetails.getProfession());
+//		detailsdto.setMaritalStatus(personalDetails.getMaritalStatus());
+//		detailsdto.setPinCode(personalDetails.getPincode());
+//		detailsdto.setAlternateAddress(personalDetails.getAlternateAddress());
+//		detailsdto.setAddharCard(personalDetails.getAddharCard());
+//		detailsdto.setArea(personalDetails.getArea());
+//		detailsdto.setPancardNo(personalDetails.getPancardNo());
+//		detailsdto.setState(personalDetails.getState());
+//		detailsdto.setTown(personalDetails.getTown());
+//
+//		return proposerRepository.findById(id);
+//	}
+//	
+//}
 
 
 
@@ -1386,81 +1528,6 @@ public class ProposalServiceImp implements ProposalService {
 //
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-//	
-//	
 //	
 //	@Override
 //	@Scheduled(fixedDelay = 10000)
@@ -1605,9 +1672,6 @@ public class ProposalServiceImp implements ProposalService {
 //	}
 
 
-
-
-
 //	@Override
 //	@Scheduled(fixedDelay = 10000)
 //	public void processPendingQueues() {
@@ -1734,29 +1798,6 @@ public class ProposalServiceImp implements ProposalService {
 //	}
 //}
 //
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -1893,40 +1934,6 @@ public class ProposalServiceImp implements ProposalService {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 //		for (Queue queue : pendingQueues) {
 //
 //
@@ -1971,5 +1978,144 @@ public class ProposalServiceImp implements ProposalService {
 //
 //		}
 //	}
+//
+
+
+
+
+//@Override
+//public List<PersonalDetails> getPaginationList(PaginationList paginationList) {
+//
+//
+//	if(paginationList==null) {
+//
+//		throw new IllegalArgumentException("List is Empty ");
+//	}
+//
+//
+//
+//
+//	// 2 stp
+//	CriteriaBuilder criteriaBuilder = entityManager.getCriteriaBuilder();									 // Yeh actually entity class se ayga
+//	// criteria builder banega
+//	CriteriaQuery<PersonalDetails> criteriaQuery = criteriaBuilder.createQuery(PersonalDetails.class); // then
+//
+//	Root<PersonalDetails> root = criteriaQuery.from(PersonalDetails.class);
+//
+//	// SearchFilter [] searchFilters = paginationList.getSearchFilters();
+//
+//	// predicate is easy to add when list we want to add using AND operator
+//	List<Predicate> predicates = new ArrayList<>();
+//
+//	List<SearchFilter> searchFilters = paginationList.getFilters();
+//
+//	String status  = "";
+//
+//	if (searchFilters != null)
+//
+//		for (SearchFilter f : searchFilters) {
+//
+//			if (f.getStatus() != null) {
+//				if ("N".equalsIgnoreCase(f.getStatus())) {
+//					predicates.add(criteriaBuilder.equal(root.get("status"), "N"));
+//				} else {
+//					predicates.add(criteriaBuilder.equal(root.get("status"), "Y"));
+//				}
+//
+//
+//				predicates.add(criteriaBuilder.like(root.get("status"), "%" + f.getStatus() + "%"));
+//			}
+//
+//			if (f.getFullName() != null && !f.getFullName().isEmpty()) {
+//
+//				predicates.add(criteriaBuilder.like(root.get("fullName"), "%" + f.getFullName() + "%"));
+//
+//			}
+//
+//			if (f.getEmailId() != null && !f.getEmailId().isEmpty()) {
+//				predicates.add(criteriaBuilder.like(root.get("emailid"), "%" + f.getEmailId() + "%"));
+//
+//			}
+//
+//			if (f.getTown() != null && !f.getTown().isEmpty()) {
+//				predicates.add(criteriaBuilder.like(root.get("town"), "%" + f.getTown() + "%"));
+//
+//			}
+//
+//			if (f.getStatus() != null) {
+//				predicates.add(criteriaBuilder.equal(root.get("status"), f.getStatus()));
+//				// criteriaQuery.where(criteriaBuilder.equal(root.get("status"),f.getStatus()));
+//			}
+//		}
+//
+//	// add karega dynamic filter using and operator ke sath
+//	if (!predicates.isEmpty()) {
+//		criteriaQuery.where(criteriaBuilder.and(predicates.toArray(new Predicate[0])));
+//	}
+//
+//	// default wala h
+//	if (paginationList.getPage() >= 0 && paginationList.getSize() >= 0) {
+//
+//		if (paginationList.getSortBy() == null || paginationList.getSortOrder().isEmpty()) {
+//
+//			paginationList.setSortBy("id"); // updated sort
+//			paginationList.setSortOrder("DESC");
+//
+//		}
+//	}
+//
+//	// validation hua hai jab null hua and is empty hai toh
+//	if (paginationList.getSortBy() != null && !paginationList.getSortBy().isEmpty()) {
+//
+//		String sortBy = paginationList.getSortBy();
+//
+//		// if asc is present hai toh sort kar de
+//		if ("ASC".equalsIgnoreCase(paginationList.getSortOrder())) {
+//
+//			criteriaQuery.orderBy(criteriaBuilder.asc(root.get(sortBy))); // asc le liye
+//		}
+//
+//		else {
+//
+//			criteriaQuery.orderBy(criteriaBuilder.desc(root.get(sortBy))); // desc ke liye
+//
+//		}
+//
+//	}
+//
+//	TypedQuery<PersonalDetails> typedQuery = entityManager.createQuery(criteriaQuery);
+//
+//	List<PersonalDetails> resultList = typedQuery.getResultList();
+//
+//
+//	if (paginationList.getPage() > 0 && paginationList.getSize() > 0) {
+//
+//		int page = paginationList.getPage();
+//		int size = paginationList.getSize();
+//
+//		typedQuery.setFirstResult((page - 1) * size);
+//
+//		if (paginationList.getPage() != null) {
+//			System.out.println("---" + page + size);
+//		} else {
+//			System.out.println(paginationList.getPage());
+//
+//			System.out.println("Page nhi mila ");
+//		}
+//		int firstResult = typedQuery.getResultList().size();
+//		//TypedQuery<PersonalDetails> setMaxResults = typedQuery.setMaxResults(size);
+//
+//
+//		System.err.println("setMaxResults >>>>"+firstResult);
+//		totalRecord = firstResult;
+//
+//
+//
+//	}
+//	return typedQuery.getResultList();
+//
+//
+//
+//
 //}
 
